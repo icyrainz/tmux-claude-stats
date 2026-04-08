@@ -7,6 +7,7 @@ DEFAULT_WARN="${2:-60}"
 DEFAULT_CRIT="${3:-90}"
 
 CACHE_FILE="/tmp/claude-stats.json"
+STALE_SECONDS=1800
 
 COLOR_WARN="#e5c07b"
 COLOR_CRIT="#e06c75"
@@ -33,14 +34,29 @@ cache=$(cat "$CACHE_FILE" 2>/dev/null) || {
 }
 
 now=$(date +%s)
+updated_at=$(printf '%s' "$cache" | jq -r '.updated_at // 0' 2>/dev/null)
+age=$((now - ${updated_at:-0}))
+stale=false
+if [ "$age" -gt "$STALE_SECONDS" ] || [ "${updated_at:-0}" = "0" ]; then
+    stale=true
+fi
 
 # --- Read all values from cache ---
+# If stale, null out utilization values (shows --) but keep resets_at (absolute time)
 
-five_hour=$(printf '%s' "$cache" | jq -r '.five_hour // "null"')
-seven_day=$(printf '%s' "$cache" | jq -r '.seven_day // "null"')
-seven_day_sonnet=$(printf '%s' "$cache" | jq -r '.seven_day_sonnet // "null"')
-seven_day_opus=$(printf '%s' "$cache" | jq -r '.seven_day_opus // "null"')
-seven_day_cowork=$(printf '%s' "$cache" | jq -r '.seven_day_cowork // "null"')
+if [ "$stale" = true ]; then
+    five_hour="null"
+    seven_day="null"
+    seven_day_sonnet="null"
+    seven_day_opus="null"
+    seven_day_cowork="null"
+else
+    five_hour=$(printf '%s' "$cache" | jq -r '.five_hour // "null"')
+    seven_day=$(printf '%s' "$cache" | jq -r '.seven_day // "null"')
+    seven_day_sonnet=$(printf '%s' "$cache" | jq -r '.seven_day_sonnet // "null"')
+    seven_day_opus=$(printf '%s' "$cache" | jq -r '.seven_day_opus // "null"')
+    seven_day_cowork=$(printf '%s' "$cache" | jq -r '.seven_day_cowork // "null"')
+fi
 five_hour_resets_at=$(printf '%s' "$cache" | jq -r '.five_hour_resets_at // "null"')
 
 get_value() {
