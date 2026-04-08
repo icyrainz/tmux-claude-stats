@@ -36,6 +36,7 @@ fetch_usage() {
 
     printf '%s' "$response" | jq --argjson now "$now" '{
         five_hour: (if .five_hour.utilization then (.five_hour.utilization | round) else null end),
+        five_hour_resets_at: (if .five_hour.resets_at then (.five_hour.resets_at | sub("\\.[0-9]+.*$"; "Z") | fromdateiso8601) else null end),
         seven_day: (if .seven_day.utilization then (.seven_day.utilization | round) else null end),
         seven_day_sonnet: (if .seven_day_sonnet.utilization then (.seven_day_sonnet.utilization | round) else null end),
         seven_day_opus: (if .seven_day_opus.utilization then (.seven_day_opus.utilization | round) else null end),
