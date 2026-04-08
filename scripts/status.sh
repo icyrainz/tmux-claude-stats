@@ -7,7 +7,6 @@ DEFAULT_WARN="${2:-60}"
 DEFAULT_CRIT="${3:-90}"
 
 CACHE_FILE="/tmp/claude-stats.json"
-STALE_SECONDS=1800
 
 COLOR_WARN="#e5c07b"
 COLOR_CRIT="#e06c75"
@@ -33,15 +32,7 @@ cache=$(cat "$CACHE_FILE" 2>/dev/null) || {
     exit 0
 }
 
-updated_at=$(printf '%s' "$cache" | jq -r '.updated_at // 0' 2>/dev/null)
 now=$(date +%s)
-age=$((now - ${updated_at:-0}))
-
-if [ "$age" -gt "$STALE_SECONDS" ] || [ "${updated_at:-0}" = "0" ]; then
-    icon=$(extract_trailing_icon "$FORMAT")
-    printf '#[fg=%s]--%s#[fg=default]' "$COLOR_STALE" "$icon"
-    exit 0
-fi
 
 # --- Read all values from cache ---
 
@@ -90,7 +81,7 @@ resets_char() {
     now=$(date +%s)
 
     if [ "$resets_at" = "null" ] || [ "$resets_at" -le "$now" ] 2>/dev/null; then
-        printf '⠀'
+        printf '#[fg=%s]-#[fg=default]' "$COLOR_STALE"
         return
     fi
 
