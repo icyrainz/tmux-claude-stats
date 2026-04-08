@@ -117,20 +117,18 @@ resets_char() {
         char="▇"
     elif [ "$minutes" -lt 30 ]; then
         char="█"
-    # Braille phase: >= 30 min, 30 min per dot
+    # Braille phase: >= 30 min, N dots = ≤ N×30 min remaining
     elif [ "$minutes" -lt 60 ]; then
-        char="⢀"
-    elif [ "$minutes" -lt 90 ]; then
         char="⣀"
-    elif [ "$minutes" -lt 120 ]; then
+    elif [ "$minutes" -lt 90 ]; then
         char="⣄"
-    elif [ "$minutes" -lt 150 ]; then
+    elif [ "$minutes" -lt 120 ]; then
         char="⣤"
-    elif [ "$minutes" -lt 180 ]; then
+    elif [ "$minutes" -lt 150 ]; then
         char="⣦"
-    elif [ "$minutes" -lt 210 ]; then
+    elif [ "$minutes" -lt 180 ]; then
         char="⣶"
-    elif [ "$minutes" -lt 240 ]; then
+    elif [ "$minutes" -lt 210 ]; then
         char="⣷"
     else
         char="⣿"
