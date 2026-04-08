@@ -47,17 +47,18 @@ set -g status-right '#{claude_stats}'
 | `%7do` | 7-day Opus utilization |
 | `%7dc` | 7-day cowork utilization |
 | `%%` | Literal `%` |
+| `%5r` | 5-hour reset countdown (braille dots → block elements) |
 
 Each variable accepts optional inline thresholds: `%5h{60,90}` (warn at 60%, critical at 90%).
 
 ### Example formats
 
 ```tmux
-# 5-hour only with icon (default)
-set -g @claude-stats-format '%5h{60,90}✦'
+# 5-hour with countdown (default)
+set -g @claude-stats-format '%5h{60,90}✦%5r'
 
-# 5-hour and 7-day
-set -g @claude-stats-format '%5h{60,90}/%7d{60,90}✦'
+# 5-hour and 7-day with countdown
+set -g @claude-stats-format '%5h{60,90}/%7d{60,90}✦%5r'
 
 # All breakdowns
 set -g @claude-stats-format '5h:%5h 7d:%7d s:%7ds o:%7do'
