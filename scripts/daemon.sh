@@ -4,9 +4,23 @@
 INTERVAL="${1:-300}"
 CACHE_FILE="/tmp/claude-stats.json"
 CACHE_TMP="/tmp/claude-stats.json.tmp"
-PIDFILE="/tmp/claude-stats.pid"
+LOCKDIR="/tmp/claude-stats.lock"
 
-echo $$ > "$PIDFILE"
+# Acquire lock via mkdir (atomic on all platforms) or exit
+if ! mkdir "$LOCKDIR" 2>/dev/null; then
+    # Check if the lock holder is still alive
+    lock_pid=$(cat "$LOCKDIR/pid" 2>/dev/null)
+    if [ -n "$lock_pid" ] && kill -0 "$lock_pid" 2>/dev/null; then
+        exit 0  # another daemon is running
+    fi
+    # Stale lock — reclaim
+    rm -rf "$LOCKDIR"
+    mkdir "$LOCKDIR" 2>/dev/null || exit 0
+fi
+echo $$ > "$LOCKDIR/pid"
+
+cleanup() { rm -rf "$LOCKDIR"; }
+trap cleanup EXIT INT TERM
 
 fetch_usage() {
     local creds token response now
@@ -34,7 +48,8 @@ fetch_usage() {
 
     now=$(date +%s)
 
-    printf '%s' "$response" | jq --argjson now "$now" '{
+    local new_data old_data
+    new_data=$(printf '%s' "$response" | jq --argjson now "$now" '{
         five_hour: (if .five_hour.utilization then (.five_hour.utilization | round) else null end),
         five_hour_resets_at: (if .five_hour.resets_at then (.five_hour.resets_at | sub("\\.[0-9]+.*$"; "Z") | fromdateiso8601) else null end),
         seven_day: (if .seven_day.utilization then (.seven_day.utilization | round) else null end),
@@ -42,7 +57,15 @@ fetch_usage() {
         seven_day_opus: (if .seven_day_opus.utilization then (.seven_day_opus.utilization | round) else null end),
         seven_day_cowork: (if .seven_day_cowork.utilization then (.seven_day_cowork.utilization | round) else null end),
         updated_at: $now
-    }' > "$CACHE_TMP" 2>/dev/null && mv "$CACHE_TMP" "$CACHE_FILE"
+    }' 2>/dev/null) || return 1
+
+    # Merge: keep existing cache values for any fields the new fetch returned as null
+    if [ -f "$CACHE_FILE" ]; then
+        old_data=$(cat "$CACHE_FILE" 2>/dev/null)
+        printf '%s\n%s' "$old_data" "$new_data" | jq -s '.[0] as $old | .[1] | to_entries | map(if .value == null then .key as $k | .value = $old[$k] else . end) | from_entries' > "$CACHE_TMP" 2>/dev/null && mv "$CACHE_TMP" "$CACHE_FILE"
+    else
+        printf '%s' "$new_data" > "$CACHE_TMP" && mv "$CACHE_TMP" "$CACHE_FILE"
+    fi
 }
 
 while true; do

@@ -19,21 +19,9 @@ interval=$(get_tmux_option "@claude-stats-interval" "300")
 warn=$(get_tmux_option "@claude-stats-warn" "60")
 crit=$(get_tmux_option "@claude-stats-crit" "90")
 
-# Start daemon if not already running (pidfile dedup)
-pidfile="/tmp/claude-stats.pid"
-start_daemon=true
-
-if [ -f "$pidfile" ]; then
-    pid=$(cat "$pidfile" 2>/dev/null)
-    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-        start_daemon=false
-    fi
-fi
-
-if [ "$start_daemon" = true ]; then
-    "$CURRENT_DIR/scripts/daemon.sh" "$interval" &
-    disown 2>/dev/null
-fi
+# Start daemon — flock inside daemon.sh guarantees single instance
+"$CURRENT_DIR/scripts/daemon.sh" "$interval" &
+disown 2>/dev/null
 
 # Register #{claude_stats} interpolation via string substitution
 # Escape % as %% so tmux's strftime pass doesn't eat our template variables
