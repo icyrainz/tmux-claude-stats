@@ -19,8 +19,11 @@ if ! mkdir "$LOCKDIR" 2>/dev/null; then
 fi
 echo $$ > "$LOCKDIR/pid"
 
-cleanup() { rm -rf "$LOCKDIR"; }
-trap cleanup EXIT INT TERM
+# Exit on signals (EXIT runs cleanup); a handler that only cleaned up would
+# drop the lock and keep looping, letting a second daemon start beside it.
+cleanup() { [ "$(cat "$LOCKDIR/pid" 2>/dev/null)" = "$$" ] && rm -rf "$LOCKDIR"; }
+trap cleanup EXIT
+trap 'exit 0' INT TERM
 
 fetch_usage() {
     local creds token response now
@@ -60,8 +63,9 @@ fetch_usage() {
         updated_at: $now
     }' 2>/dev/null) || return 1
 
-    # Merge: keep existing cache values for any fields the new fetch returned as null
-    if [ -f "$CACHE_FILE" ]; then
+    # Merge: keep existing cache values for any fields the new fetch returned as null.
+    # An empty or corrupt cache would fail the merge forever, so overwrite it instead.
+    if jq -e 'type == "object"' "$CACHE_FILE" > /dev/null 2>&1; then
         old_data=$(cat "$CACHE_FILE" 2>/dev/null)
         printf '%s\n%s' "$old_data" "$new_data" | jq -s '.[0] as $old | .[1] | to_entries | map(if .value == null then .key as $k | .value = $old[$k] else . end) | from_entries' > "$CACHE_TMP" 2>/dev/null && mv "$CACHE_TMP" "$CACHE_FILE"
     else
@@ -71,5 +75,6 @@ fetch_usage() {
 
 while true; do
     fetch_usage
-    sleep "$INTERVAL"
+    # Background + wait so a signal is handled now, not after the sleep ends
+    sleep "$INTERVAL" & wait $!
 done
